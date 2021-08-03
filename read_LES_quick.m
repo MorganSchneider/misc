@@ -14,9 +14,9 @@ clear
 close all
 
 % Name of simulation folder within the primary data directory
-drive_name = 'seagate1';
+%drive_name = 'seagate1';
 % OPTIONS: suctvort  suctvort_large  torgen  moore  onecell  breakdown
-sim_base = 'moore';
+sim_base = 'twocell';
 
 % Rename to your matlab directory
 base_dir = '/Users/schneider/Documents';
@@ -42,20 +42,20 @@ num_times = 10; % Number of times stored in the file (does not change)
 name_type = 1; % Different OSs or environments can produce different file conventions, so you may have to change this to 1, 2, or 3
 view_fact = 0.9; % fraction of the domain in view (smaller values zoom in on the tornado)
 
-axi_stats_flag = false; % Compute and save axisymmetric statistics
-compute_mean = false; % Computes a mean value of the different times (use if fnum_st and fnum_end are different)
-convert_mat = true; % Saves a mat file of the output
-save_figs = false;
+axi_stats_flag = true; % Compute and save axisymmetric statistics
+compute_mean = false; % Computes time-averaged values (use if fnum_st and fnum_end are different)
+convert_mat = false; % Saves a mat file of the output
+save_figs = true;
 
 % File selection
-fnum_st = 1; % Choose starting file number
-fnum_end = 16; % Choose ending file number
+fnum_st = 10; % Choose starting file number
+fnum_end = 10; % Choose ending file number
 
 % Plotting
 % size(ustore) = [176 176 80 10]
 % 176x176 horizontal grid, 80 grid levels, 10 time indices
-lev = 20; % Choose height index for plotting (e.g., 5 is the 5th grid level) 
-tme = 2; % time index to plot (can't exceed num_times)
+lev = 10; % Choose height index for plotting (e.g., 5 is the 5th grid level) 
+tme = 1; % time index to plot (can't exceed num_times)
 
 %%
 %%%%%%%%%%%%%%%%%%%%%%%%
@@ -79,7 +79,7 @@ Zc = fread(fid, Nx*Ny*Nz, 'real*4'); % z coordinates
 
 % Dimensionalize variables
 Xc = squeeze(Xc(1:Nx));
-Yc = squeeze(Yc(1:Ny));
+Yc = Xc;
 Zc = squeeze(Zc(1+(Nx-1)*(Ny-1) : (Nx-1)*(Ny-1) : (Nz)*(Nx-1)*(Ny-1)+1));
 Xc = Xc * v0^2 / 9.80;
 Yc = Yc * v0^2 / 9.80;
@@ -124,8 +124,14 @@ x_LES = Xmf;
 y_LES = Ymf;
 z_LES = Zmf;
 
+r_LES = sqrt(Xmf.^2 + Ymf.^2);
+phi_LES = atan(Xmf ./ Ymf); % Azimuth angles w.r.t TOR center (domain center)
+% adjust angle values for each quadrant
+phi_LES(Ymf < 0) = phi_LES(Ymf < 0) + pi; % Lower 2 quadrants
+phi_LES(Xmf < 0 & Ymf >= 0) = phi_LES(Xmf < 0 & Ymf >= 0) + 2*pi; % Upper left quadrant
+
+
 for fnum = fnum_st:fnum_end
-    cd(data_dir)
     %LES file name
     if name_type == 1
         LES_name = ['LES_mean_1_6_fnum' num2str(fnum) '.dat'];
@@ -145,8 +151,8 @@ for fnum = fnum_st:fnum_end
     %%%%%%%%%%%%%%%%%%%%%%%%
 
     % Opens the file
-    fid = fopen([data_dir, '/', LES_name], 'r', 'ieee-le');
-    fread(fid, 1, 'int');
+    fid = fopen(LES_name, 'r', 'ieee-le');
+    tmp = fread(fid, 1, 'int');
     
     time = zeros(1, num_times);
     ustore = zeros(size(Xmf,1), size(Xmf,2), size(Xmf,3), num_times);
@@ -154,39 +160,52 @@ for fnum = fnum_st:fnum_end
     wstore = ustore;
     pstore = ustore;
     tkestore = ustore;
+    urstore = ustore;
+    vtstore = ustore;
+    Lstore = ustore;
 
     % Loops through the LES data
     for kdx = 1:num_times
         % LES model time
         time(kdx) = fread(fid, 1, 'real*4') * v0 / g;
-        fread(fid, 2, 'int');
+        tmp = fread(fid, 2, 'int');
 
         % U component of the wind (cartesian)
         u = single(fread(fid, max(size(Xmf(:))), 'real*4')) * v0 + vtrans;
-        fread(fid, 2, 'int');
+        tmp = fread(fid, 2, 'int');
 
         % V component of the wind (cartesian)
         v = single(fread(fid, max(size(Xmf(:))), 'real*4')) * v0;
-        fread(fid, 2 ,'int');
+        tmp = fread(fid, 2 ,'int');
 
         % W component of the wind (cartesian)
         w = single(fread(fid, max(size(Xmf(:))), 'real*4')) * v0;
-        fread(fid, 2, 'int');
-
+        tmp = fread(fid, 2, 'int');
+        
         % Perturbation pressure 
         p = single(fread(fid, max(size(Xmf(:))), 'real*4')) * v0^2;
-        fread(fid, 2, 'int');
+        tmp = fread(fid, 2, 'int');
 
         % Turbulent kinetic energy (resolved component)
         tke = single(fread(fid, max(size(Xmf(:))), 'real*4')) * v0^2;
-        fread(fid, 2, 'int');
+        tmp = fread(fid, 2, 'int');
+        
 
         % Reshape the matrices for a three-dimensional grid
-        u = reshape(u, size(Xmf,1), size(Xmf,2), size(Xmf,3));
-        v = reshape(v, size(Xmf,1), size(Xmf,2), size(Xmf,3));
-        w = reshape(w, size(Xmf,1), size(Xmf,2), size(Xmf,3));
-        p = reshape(p, size(Xmf,1), size(Xmf,2), size(Xmf,3));
-        tke = reshape(tke, size(Xmf,1), size(Xmf,2), size(Xmf,3));
+        u = reshape(u, [size(Xmf,1), size(Xmf,2), size(Xmf,3)]);
+        v = reshape(v, [size(Xmf,1), size(Xmf,2), size(Xmf,3)]);
+        w = reshape(w, [size(Xmf,1), size(Xmf,2), size(Xmf,3)]);
+        p = reshape(p, [size(Xmf,1), size(Xmf,2), size(Xmf,3)]);
+        tke = reshape(tke, [size(Xmf,1), size(Xmf,2), size(Xmf,3)]);
+        
+        % Ur component of the wind (polar)
+        ur = u.*sin(phi_LES) + v.*cos(phi_LES);
+        
+        % Vt component of the wind (polar)
+        vt = v.*sin(phi_LES) - u.*cos(phi_LES);
+        
+        % Angular momentum
+        L = vt .* r_LES;
 
         % Create a 4-D matrix (x,y,z,t) to store the data 
         ustore(1:size(Xmf,1), 1:size(Xmf,2), 1:size(Xmf,3), kdx) = u; 
@@ -194,65 +213,156 @@ for fnum = fnum_st:fnum_end
         wstore(1:size(Xmf,1), 1:size(Xmf,2), 1:size(Xmf,3), kdx) = w;
         pstore(1:size(Xmf,1), 1:size(Xmf,2), 1:size(Xmf,3), kdx) = p;
         tkestore(1:size(Xmf,1), 1:size(Xmf,2), 1:size(Xmf,3), kdx) = tke;
-        clear u v w p tke;
+        urstore(1:size(Xmf,1), 1:size(Xmf,2), 1:size(Xmf,3), kdx) = ur;
+        vtstore(1:size(Xmf,1), 1:size(Xmf,2), 1:size(Xmf,3), kdx) = vt;
+        Lstore(1:size(Xmf,1), 1:size(Xmf,2), 1:size(Xmf,3), kdx) = L;
+        clear u v w p tke ur vt L;
     end
     fclose(fid);
     cd(base_dir)
 
     % Plot u,v,w,tke at the selected height level and time on lines 32 ? 33
-%     figure(1)
-%     feval('boonlib', 'bsizewin', 1, [1000 1000])
-%     
-%     subplot(2,2,1)
-%     tmp = squeeze(double(ustore(:,:,lev,tme)));
-%     pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), tmp)
-%     shading flat
-%     colorbar
-%     xlabel('X(m)')
-%     ylabel('Y(m)')
-%     caxis([-nanmax(abs(tmp(:))) nanmax(abs(tmp(:)))])
-%     axis(view_fact * [-nanmax(Xmf(:)) nanmax(Xmf(:)) -nanmax(Xmf(:)) nanmax(Xmf(:))])
-%     title(['U (m/s) at z = ' num2str(roundn(Zm(1,1,lev), -1)) ' m'], 'FontSize', 14)
-%     
-%     subplot(2,2,2)
-%     tmp=squeeze(double(vstore(:,:,lev,tme)));
-%     pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), tmp)
-%     shading flat
-%     colorbar
-%     xlabel('X(m)')
-%     ylabel('Y(m)')
-%     axis(view_fact * [-nanmax(Xmf(:)) nanmax(Xmf(:)) -nanmax(Xmf(:)) nanmax(Xmf(:))])
-%     caxis([-nanmax(abs(tmp(:))) nanmax(abs(tmp(:)))])
-%     title(['V (m/s) at z = ' num2str(roundn(Zm(1,1,lev), -1)) ' m'], 'FontSize', 14)
-%     
-%     subplot(2,2,3)
-%     tmp=squeeze(double(wstore(:,:,lev,tme)));
-%     pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), tmp)
-%     shading flat
-%     colorbar
-%     xlabel('X(m)')
-%     ylabel('Y(m)')
-%     axis(view_fact * [-nanmax(Xmf(:)) nanmax(Xmf(:)) -nanmax(Xmf(:)) nanmax(Xmf(:))])
-%     caxis([-nanmax(abs(tmp(:))) nanmax(abs(tmp(:)))])
-%     title(['W (m/s) at z = ' num2str(roundn(Zm(1,1,lev), -1)) ' m'], 'FontSize', 14)
-%     
-%     subplot(2,2,4)
+    figure(1)
+    feval('boonlib', 'bsizewin', 1, [700 600])
+    
+    subplot(2,2,1)
+    tmp = squeeze(double(ustore(:,:,lev,tme)));
+    hs = pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), tmp);
+    colormap(blib('rbmap'))
+    shading flat
+    axis square
+    c = colorbar;
+    c.Label.String = 'm s^{-1}';
+    c.Label.FontSize = 13;
+    c.Label.VerticalAlignment = 'middle';
+    xlabel('x (m)', 'FontSize', 14)
+    ylabel('y (m)', 'FontSize', 14)
+    caxis([-nanmax(abs(tmp(:))) nanmax(abs(tmp(:)))])
+    axis(view_fact * [-nanmax(Xmf(:)) nanmax(Xmf(:)) -nanmax(Xmf(:)) nanmax(Xmf(:))])
+    %title(['u (m s^{-1}) at z = ' num2str(roundn(Zm(1,1,lev), 1)) ' m'], 'FontSize', 14)
+    title('(a) U wind', 'FontSize', 14)
+    
+    subplot(2,2,2)
+    tmp = squeeze(double(vstore(:,:,lev,tme)));
+    hs(2) = pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), tmp);
+    colormap(blib('rbmap'))
+    shading flat
+    axis square
+    c = colorbar;
+    c.Label.String = 'm s^{-1}';
+    c.Label.FontSize = 13;
+    c.Label.VerticalAlignment = 'middle';
+    xlabel('x (m)', 'FontSize', 14)
+    ylabel('y (m)', 'FontSize', 14)
+    axis(view_fact * [-nanmax(Xmf(:)) nanmax(Xmf(:)) -nanmax(Xmf(:)) nanmax(Xmf(:))])
+    caxis([-nanmax(abs(tmp(:))) nanmax(abs(tmp(:)))])
+    %title(['v (m s^{-1}) at z = ' num2str(roundn(Zm(1,1,lev), 1)) ' m'], 'FontSize', 14)
+    title('(b) V wind', 'FontSize', 14)
+    
+    subplot(2,2,[3,4])
+    tmp = squeeze(double(wstore(:,:,lev,tme)));
+    hs(3) = pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), tmp);
+    colormap(blib('rbmap'))
+    shading flat
+    axis square
+    c = colorbar;
+    c.Label.String = 'm s^{-1}';
+    c.Label.FontSize = 13;
+    c.Label.VerticalAlignment = 'middle';
+    xlabel('x (m)', 'FontSize', 14)
+    ylabel('y (m)', 'FontSize', 14)
+    axis(view_fact * [-nanmax(Xmf(:)) nanmax(Xmf(:)) -nanmax(Xmf(:)) nanmax(Xmf(:))])
+    caxis([-nanmax(abs(tmp(:))) nanmax(abs(tmp(:)))])
+    %title(['w (m s^{-1}) at z = ' num2str(roundn(Zm(1,1,lev), 1)) ' m'], 'FontSize', 14)
+    title('(c) W wind', 'FontSize', 14)
+    
+%     ha = subplot(2,2,4);
 %     tmp=squeeze(double(tkestore(:,:,lev,tme)));
-%     pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), tmp);
+%     hs(4) = pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), tmp);
+%     colormap(ha, blib('rbmap'))
 %     shading flat
 %     colorbar
-%     xlabel('X(m)')
-%     ylabel('Y(m)')
+%     xlabel('x (m)')
+%     ylabel('y (m)')
 %     axis(view_fact * [-nanmax(Xmf(:)) nanmax(Xmf(:)) -nanmax(Xmf(:)) nanmax(Xmf(:))])
-%     title(['TKE (m^2/s^2) at z = ' num2str(roundn(Zm(1,1,lev), -1)) ' m'], 'FontSize', 14)
-% 
-% 
-%     set(gcf, 'PaperPositionMode', 'auto'); % This makes the plot look nicer
-%     if save_figs
-%         cd(save_dir)
-%             print(['LES_' num2str(lev) '_' num2str(fnum) '_' num2str(tme)], '-dpng');
-%         cd(base_dir)
-%     end
+%     %title(['TKE (m^2 s^{-2}) at z = ' num2str(roundn(Zm(1,1,lev), 1)) ' m'], 'FontSize', 14)
+%     title('(d) TKE', 'FontSize', 14)
+    
+    %set(ha, 'DataAspect', [1 1 1])
+    set(hs, 'EdgeColor', 'none')
+    
+    set(gcf, 'PaperPositionMode', 'auto', 'renderer', 'zbuffer'); % This makes the plot look nicer
+    if save_figs
+        cd(save_dir)
+            print(['LES_z' num2str(lev) '_f' num2str(fnum) '_t' num2str(tme)], '-dpng');
+        cd(base_dir)
+    end
+    
+    
+    figure(2)
+    
+    subplot(1,3,1)
+    tmp = squeeze(mean(double(urstore(:,:,:,tme)),3));
+    pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), tmp)
+    colormap(blib('rbmap'))
+    shading flat
+    colorbar
+    xlabel('x (m)')
+    ylabel('y (m)')
+    axis(view_fact * [-nanmax(Xmf(:)) nanmax(Xmf(:)) -nanmax(Xmf(:)) nanmax(Xmf(:))])
+    caxis([-nanmax(abs(tmp(:))) nanmax(abs(tmp(:)))])
+    title('(a) Height-averaged u_r', 'FontSize', 14)
+    
+    subplot(1,3,2)
+    tmp = squeeze(mean(double(vtstore(:,:,:,tme)),3));
+    pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), tmp)
+    colormap(blib('rbmap'))
+    shading flat
+    colorbar
+    xlabel('x (m)')
+    ylabel('y (m)')
+    axis(view_fact * [-nanmax(Xmf(:)) nanmax(Xmf(:)) -nanmax(Xmf(:)) nanmax(Xmf(:))])
+    caxis([-nanmax(abs(tmp(:))) nanmax(abs(tmp(:)))])
+    title('(b) Height-averaged v_t', 'FontSize', 14)
+    
+    subplot(1,3,3)
+    tmp = squeeze(mean(double(Lstore(:,:,:,tme)),3));
+    pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), tmp)
+    shading flat
+    colorbar
+    xlabel('x (m)')
+    ylabel('y (m)')
+    axis(view_fact * [-nanmax(Xmf(:)) nanmax(Xmf(:)) -nanmax(Xmf(:)) nanmax(Xmf(:))])
+    caxis([0 nanmax(abs(tmp(:)))])
+    title('(c) Height-averaged L', 'FontSize', 14)
+
+    set(gcf, 'PaperPositionMode', 'auto'); % This makes the plot look nicer
+    if save_figs
+        cd(save_dir)
+            print(['LESpolar_z' num2str(lev) '_f' num2str(fnum) '_t' num2str(tme)], '-dpng');
+        cd(base_dir)
+    end
+    
+    figure(3)
+    tmp = squeeze(mean(double(Lstore(:,:,:,tme)),3));
+    pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), tmp)
+    shading flat
+    axis square
+    c = colorbar;
+    c.Label.String = 'm^2 s^{-1}';
+    c.Label.FontSize = 13;
+    xlabel('x (m)', 'FontSize', 14)
+    ylabel('y (m)', 'FontSize', 14)
+    axis(view_fact * [-nanmax(Xmf(:)) nanmax(Xmf(:)) -nanmax(Xmf(:)) nanmax(Xmf(:))])
+    caxis([0 nanmax(abs(tmp(:)))])
+    title('Vertically averaged {\it L}', 'FontSize', 14)
+    
+    set(gcf, 'PaperPositionMode', 'auto'); % This makes the plot look nicer
+    if save_figs
+        cd(save_dir)
+            print('LES_ang_mom_mean', '-dpng');
+        cd(base_dir)
+    end
     
     xmin = 0;
     ymin = 0;
@@ -265,6 +375,9 @@ for fnum = fnum_st:fnum_end
     wmn = nanmean(wstore, 4);
     tkemn = nanmean(tkestore, 4);
     pmn = nanmean(pstore, 4);
+    urmn = nanmean(urstore, 4);
+    vtmn = nanmean(vtstore, 4);
+    Lmn = nanmean(Lstore, 4);
     avg_file = 1;
 
     cd(base_dir)
@@ -276,8 +389,23 @@ for fnum = fnum_st:fnum_end
         wr_save(:,:,fnum) = wr_mean;
         pr_save(:,:,fnum) = pr_mean;
         tke_save(:,:,fnum) = tke_mean;
-        ang_save(:,:,fnum) = ang_mom_mean;
+        L_save(:,:,fnum) = permute(ang_mom_mean, [2 1]);
     end
+    
+%     figure(4)
+%     
+%     subplot(2,2,1)
+%     pcolor(rtmp2, ztmp2, squeeze(ur_save))
+%     
+%     subplot(2,2,2)
+%     
+%     
+%     subplot(2,2,3)
+%     
+%     
+%     subplot(2,2,4)
+    
+    
     
     if compute_mean
         if ~exist('umn_save', 'var')
@@ -286,12 +414,14 @@ for fnum = fnum_st:fnum_end
             wmn_save = umn_save;
             pmn_save = umn_save;
             tkemn_save = umn_save;
+            Lmn_save = umn_save;
         end
        umn_save = umn_save + umn / (fnum_end - fnum_st + 1);
        vmn_save = vmn_save + vmn / (fnum_end - fnum_st + 1);
        wmn_save = wmn_save + wmn / (fnum_end - fnum_st + 1);
        pmn_save = pmn_save + pmn / (fnum_end - fnum_st + 1);
        tkemn_save = tkemn_save + tkemn / (fnum_end - fnum_st + 1);
+       Lmn_save = Lmn_save + Lmn / (fnum_end - fnum_st + 1);
     end
     
     u_LES(:, :, :, fnum*10-9: fnum*10) = ustore;
@@ -306,18 +436,18 @@ for fnum = fnum_st:fnum_end
         if fnum == fnum_st
             save('grid.mat', 'Xmf', 'Ymf', 'Zmf');
         end
-        save(['LES_' num2str(fnum) '.mat'], 'ustore', 'vstore', 'wstore', 'tkestore', 'pstore', 'time');
+        save(['LES_' num2str(fnum) '.mat'], 'ustore', 'vstore', 'wstore', 'tkestore', 'pstore', 'urstore', 'vtstore', 'Lstore', 'time');
         cd(base_dir)
     end
-    clear ustore vstore pstore wstore tkestore time;
+    %clear ustore vstore pstore wstore tkestore urstore vtstore Lstore time;
 end
 
-save([save_dir '/LES_all.mat'], 'x_LES', 'y_LES', 'z_LES',...
-    't_LES', 'u_LES', 'v_LES', 'w_LES', 'tke_LES', 'p_LES', '-v7.3', '-nocompression')
+%save([save_dir '/LES_all.mat'], 'x_LES', 'y_LES', 'z_LES',...
+%    't_LES', 'u_LES', 'v_LES', 'w_LES', 'tke_LES', 'p_LES', '-v7.3', '-nocompression')
 
 if compute_mean
     cd(save_dir)
-    save('mean.mat', 'umn_save', 'vmn_save', 'wmn_save', 'pmn_save', 'tkemn_save');
+    save('mean.mat', 'umn_save', 'vmn_save', 'wmn_save', 'pmn_save', 'tkemn_save', 'Lmn_save');
     
     lev = 3;
     
@@ -330,6 +460,9 @@ if compute_mean
     colorbar
     caxis([-cmax cmax])
     title(['Mean U (m/s) at z = ' num2str(roundn(Zm(1,1,lev), -1)) ' m'], 'FontSize', 14)
+    if save_figs
+        print([save_dir '/' 'umean_t0_z' num2str(roundn(Zm(1,1,lev), -1))], '-dpng')
+    end
     
     figure(152)
     cmax = nanmax(nanmax(abs(double(vmn_save(:,:,lev)))));
@@ -340,6 +473,9 @@ if compute_mean
     colorbar
     caxis([-cmax cmax])
     title(['Mean V (m/s) at z = ' num2str(roundn(Zm(1,1,lev), -1)) ' m'], 'FontSize', 14)
+    if save_figs
+        print([save_dir '/' 'vmean_t0_z' num2str(roundn(Zm(1,1,lev), -1))], '-dpng')
+    end
     
     figure(153)
     cmax = nanmax(nanmax(abs(double(wmn_save(:,:,lev)))));
@@ -350,6 +486,9 @@ if compute_mean
     colorbar
     caxis([-cmax cmax])
     title(['Mean W (m/s) at z = ' num2str(roundn(Zm(1,1,lev), -1)) ' m'], 'FontSize', 14)
+    if save_figs
+        print([save_dir '/' 'wmean_t0_z' num2str(roundn(Zm(1,1,lev), -1))], '-dpng')
+    end
     
     figure(154)
     cmax = nanmax(nanmax(abs(double(tkemn_save(:,:,lev)))));
@@ -360,6 +499,9 @@ if compute_mean
     colorbar
     caxis([0 cmax])
     title(['Mean TKE (m^2/s^2) at z = ' num2str(roundn(Zm(1,1,lev), -1)) ' m'], 'FontSize', 14)
+    if save_figs
+        print([save_dir '/' 'tkemean_t0_z' num2str(roundn(Zm(1,1,lev), -1))], '-dpng')
+    end
     
     figure(155)
     cmax = nanmax(nanmax(abs(double(pmn_save(:,:,lev)))));
@@ -370,11 +512,15 @@ if compute_mean
     colorbar
     caxis([-cmax cmax])
     title(['Mean P'' (Pa) at z = ' num2str(roundn(Zm(1,1,lev), -1)) ' m'], 'FontSize', 14)
+    if save_figs
+        print([save_dir '/' 'pmean_t0_z' num2str(roundn(Zm(1,1,lev), -1))], '-dpng')
+    end
+    
 end
 
 if axi_stats_flag
     cd(save_dir)
-        save('axy.mat', 'ur_save', 'vr_save', 'wr_save', 'pr_save', 'ang_save', 'tke_save', 'rtmp2', 'ztmp2');
+        save('axy.mat', 'ur_save', 'vr_save', 'wr_save', 'pr_save', 'L_save', 'tke_save', 'rtmp2', 'ztmp2');
     cd(base_dir)
 end
 

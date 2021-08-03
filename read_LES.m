@@ -1,12 +1,12 @@
 % clear;
 close all;
 
-sim_name = 'torgen';
+sim_name = 'twocell';
 
 base_dir = pwd;
 data_dir = ['~/Documents/tables/les/', sim_name];
 
-v0 = 250; % This is the characteristic velocity, which scales the non-dimensional model results.  
+v0 = 100; % This is the characteristic velocity, which scales the non-dimensional model results.  
 % Common values for the two-cell vortex are 150 and 225 m/s.
 % Suggested value for the suction vortex case is 250 m/s.
 g = 9.8;
@@ -39,7 +39,7 @@ Zc = fread(fid, Nx*Ny*Nz, 'real*4');
 
 % Dimensionalize variables
 Xc = squeeze(Xc(1:Nx));
-Yc = squeeze(Yc(1:Ny));
+Yc = Xc;
 Zc = squeeze(Zc(1+(Nx-1)*(Ny-1) : (Nx-1)*(Ny-1) : (Nz)*(Nx-1)*(Ny-1)+1));
 Xc = Xc * v0^2 / 9.80;
 Yc = Yc * v0^2 / 9.80;
@@ -50,25 +50,37 @@ Zc = Zc * v0^2 / 9.80;
 % xc = (Xc(2:max(size(Xc)))+Xc(1:max(size(Xc))-1))/2;
 % yc(1,1:Ny-1) = (Yc(2:max(size(Yc)))+Yc(1:max(size(Yc))-1))/2;
 % zc(1,1,1:Nz-1) = (Zc(2:max(size(Zc)))+Zc(1:max(size(Zc))-1))/2;
-xc = Xc(1:max(size(Xc))-1);
-yc = permute(Yc(1:max(size(Yc))-1), [2 1]);
-zc = permute(Zc(1:max(size(Zc))-1), [3 2 1]);
-Xm = repmat(xc, [1 Ny-1 Nz-1]);
-Ym = repmat(yc, [Nx-1 1  Nz-1]);
-Zm = repmat(zc, [Nx-1 Ny-1 1]);
+xc = Xc(1:max(size(Xc)));
+yc = permute(Yc(1:max(size(Yc))), [2 1]);
+zc = permute(Zc(1:max(size(Zc))), [3 2 1]);
+Xm = repmat(xc, [1 Ny Nz]);
+Ym = repmat(yc, [Nx 1  Nz]);
+Zm = repmat(zc, [Nx Ny 1]);
 fclose(fid);
 
 % LES data is only stored in a subdomain where the tornado is located
-ix1 = 15;
-ix2 = Nx - 16; % minimum and maximum (x,y,z) values of indices saved
-iy1 = 15;
-iy2 = Nx - 16;
+ix1 = 1;
+ix2 = Nx;
+iy1 = 1;
+iy2 = Ny;
 iz1 = 1;
-iz2 = 51;
+iz2 = Nz;
+% ix1 = 15;
+% ix2 = Nx - 16; % minimum and maximum (x,y,z) values of indices saved
+% iy1 = 15;
+% iy2 = Nx - 16;
+% iz1 = 1;
+% iz2 = 51;
 
 Xmf = Xm(ix1:ix2, iy1:iy2, iz1:iz2); % Reconstruct grid only for saved data pts
 Ymf = Ym(ix1:ix2, iy1:iy2, iz1:iz2);
 Zmf = Zm(ix1:ix2, iy1:iy2, iz1:iz2);
+
+r = sqrt(Xmf.^2 + Ymf.^2);
+phi = atan(Xmf ./ Ymf); % Azimuth angles w.r.t TOR center (domain center)
+% adjust angle values for each quadrant
+phi(Ymf < 0) = phi(Ymf < 0) + pi; % Lower 2 quadrants
+phi(Xmf < 0 & Ymf >= 0) = phi(Xmf < 0 & Ymf >= 0) + 2*pi; % Upper left quadrant
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 % Read in the LES file %
@@ -83,6 +95,9 @@ vstore = ustore;
 wstore = ustore;
 pstore = ustore;
 tkestore = ustore;
+urstore = ustore;
+vtstore = ustore;
+Lstore = ustore;
 
 for kdx = 1:num_times
     time(kdx) = fread(fid, 1, 'real*4') * v0 / g;
@@ -103,23 +118,31 @@ for kdx = 1:num_times
     w = reshape(w, size(Xmf,1), size(Xmf,2), size(Xmf,3));
     p = reshape(p, size(Xmf,1), size(Xmf,2), size(Xmf,3));
     tke = reshape(tke, size(Xmf,1), size(Xmf,2), size(Xmf,3));
+    
+
+    ur = u.*sin(phi) + v.*cos(phi);
+    vt = v.*sin(phi) - u.*cos(phi);
+    L = vt .* r;
 
     ustore(1:size(Xmf,1), 1:size(Xmf,2), 1:size(Xmf,3), kdx) = u; 
     vstore(1:size(Xmf,1), 1:size(Xmf,2), 1:size(Xmf,3), kdx) = v;
     wstore(1:size(Xmf,1), 1:size(Xmf,2), 1:size(Xmf,3), kdx) = w;
     pstore(1:size(Xmf,1), 1:size(Xmf,2), 1:size(Xmf,3), kdx) = p;
     tkestore(1:size(Xmf,1), 1:size(Xmf,2), 1:size(Xmf,3), kdx) = tke;
-    %clear u v w p tke
+    urstore(1:size(Xmf,1), 1:size(Xmf,2), 1:size(Xmf,3), kdx) = ur;
+    vtstore(1:size(Xmf,1), 1:size(Xmf,2), 1:size(Xmf,3), kdx) = vt;
+    Lstore(1:size(Xmf,1), 1:size(Xmf,2), 1:size(Xmf,3), kdx) = L;
+    %clear u v w p tke ur vt L
 end
 fclose(fid);
 cd(base_dir)
 
-lev = 5; % z index to plot
-tme = 5; % time index to plot
+lev = 61; % z index to plot
+tme = 1; % time index to plot
 
 figure(1)
 subplot(2,2,1)
-pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), squeeze(double(ustore(:,:,lev,tme))))
+pcolor(Xmf(:,:,lev), Ymf(:,:,lev), double(ustore(:,:,lev,tme)))
 shading flat
 colorbar
 xlabel('X(m)')
@@ -135,12 +158,14 @@ ylabel('Y(m)')
 title('V (m/s)')
 
 subplot(2,2,3)
-pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), squeeze(double(wstore(:,:,lev,tme))))
+tmp = squeeze(double(wstore(:,:,lev,tme)));
+pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), tmp)
 shading flat
 colorbar
 xlabel('X(m)')
 ylabel('Y(m)')
 title('W (m/s)')
+
 
 subplot(2,2,4)
 pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), squeeze(double(tkestore(:,:,lev,tme))))
@@ -149,3 +174,44 @@ colorbar
 xlabel('X(m)')
 ylabel('Y(m)')
 title('TKE (m^2/s^2)')
+
+
+
+figure(2)
+
+subplot(1,3,1)
+tmp = squeeze(double(urstore(:,:,lev,tme)));
+pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), tmp(:,:,1))
+shading flat
+colorbar
+xlabel('X(m)')
+ylabel('Y(m)')
+title(['U_r (m/s) at z = ' num2str(roundn(Zm(1,1,lev), -1)) ' m'], 'FontSize', 14)
+
+subplot(1,3,2)
+tmp = squeeze(double(vtstore(:,:,lev,tme)));
+pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), tmp(:,:,1))
+shading flat
+colorbar
+xlabel('X(m)')
+ylabel('Y(m)')
+title(['V_t (m/s) at z = ' num2str(roundn(Zm(1,1,lev), -1)) ' m'], 'FontSize', 14)
+
+subplot(2,2,3)
+tmp = squeeze(double(wstore(:,:,lev,tme)));
+pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), tmp)
+shading flat
+colorbar
+xlabel('X(m)')
+ylabel('Y(m)')
+title(['W (m/s)at z = ' num2str(roundn(Zm(1,1,lev), -1)) ' m'], 'FontSize', 14)
+
+subplot(1,3,3)
+tmp = squeeze(double(Lstore(:,:,lev,tme)));
+pcolor(squeeze(double(Xmf(:,:,lev))), squeeze(double(Ymf(:,:,lev))), tmp(:,:,1))
+shading flat
+colorbar
+xlabel('X(m)')
+ylabel('Y(m)')
+title(['L (m^2/s) at z = ' num2str(roundn(Zm(1,1,lev), -1)) ' m'], 'FontSize', 14)
+
