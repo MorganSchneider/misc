@@ -45,11 +45,11 @@ view_fact = 0.9; % fraction of the domain in view (smaller values zoom in on the
 axi_stats_flag = true; % Compute and save axisymmetric statistics
 compute_mean = false; % Computes time-averaged values (use if fnum_st and fnum_end are different)
 convert_mat = false; % Saves a mat file of the output
-save_figs = true;
+save_figs = false;
 
 % File selection
-fnum_st = 10; % Choose starting file number
-fnum_end = 10; % Choose ending file number
+fnum_st = 1; % Choose starting file number
+fnum_end = 1; % Choose ending file number
 
 % Plotting
 % size(ustore) = [176 176 80 10]
@@ -392,18 +392,31 @@ for fnum = fnum_st:fnum_end
         L_save(:,:,fnum) = permute(ang_mom_mean, [2 1]);
     end
     
-%     figure(4)
-%     
-%     subplot(2,2,1)
-%     pcolor(rtmp2, ztmp2, squeeze(ur_save))
-%     
-%     subplot(2,2,2)
-%     
-%     
-%     subplot(2,2,3)
-%     
-%     
-%     subplot(2,2,4)
+    figure()
+    
+    subplot(1,3,1)
+    pcolor(rtmp2, ztmp2, permute(ur_mean, [2 1]))
+    shading flat
+    colorbar
+    title('Mean u_r')
+    xlabel('x (m)')
+    ylabel('z (m)')
+    
+    subplot(1,3,2)
+    pcolor(rtmp2, ztmp2, permute(vr_mean, [2 1]))
+    shading flat
+    colorbar
+    title('Mean v_t')
+    xlabel('x (m)')
+    ylabel('z (m)')
+    
+    subplot(1,3,3)
+    pcolor(rtmp2, ztmp2, permute(wr_mean, [2 1]))
+    shading flat
+    colorbar
+    title('Mean w')
+    xlabel('x (m)')
+    ylabel('z (m)')
     
     
     
