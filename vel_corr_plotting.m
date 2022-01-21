@@ -40,7 +40,7 @@ clear
 % 3 - 
 % 4 - 
 % 5 - 
-simr_plot = [0 0 0 0 0 1];
+simr_plot = [1 1 1 1 0 1];
 koun_plot = [0 0 0 0 0];
 plot_save = 0;
 
@@ -242,7 +242,7 @@ if simr_plot(1)
     xwhitespace = '                                                                          ';
     ywhitespace = '                                                   ';
     %%% THEY ARE FOR THE X AND Y AXIS LABELS
-    %%% I WILL NOT BE ACCEPTING CONSTRUCTIVE CRITICISM
+    %%% I WILL NOT BE TAKING CONSTRUCTIVE CRITICISM OF MY CODING PRACTICES
     
     f = figure(20); clf
     set(gcf, 'Units', 'inches', 'Position', [2 8 16 7])
@@ -1203,12 +1203,12 @@ if simr_plot(6)
     rsq4 = rsquared(vcorr, vcfit2(:));
     
     cffs5 = polyfit(ucbias, vbias, 1);
-    vbfit3 = polyval(cffs5, ubfit);
+    vbfit3 = polyval(cffs5, ucbias);
     rsq5 = rsquared(vbias, vbfit3(:));
     
     cffs6 = polyfit(ucbias, vcorr, 1);
-    ubfit = ucbias;
-    vcfit3 = polyval(cffs6, ubfit);
+    %ubfit = ucbias;
+    vcfit3 = polyval(cffs6, ucbias);
     rsq6 = rsquared(vcorr, vcfit3(:));
     
     
@@ -1218,20 +1218,26 @@ if simr_plot(6)
     clf
     
     subplot(3,2,1)
-%     scatter(phv, abs(vbias), '.')
-    scatter(phv, vbias, '.')
+     scatter(phv, abs(vbias), '.')
+%    scatter(phv, vbias, '.')
+    hold on
+    plot(rhofit, vbfit1, 'k', 'LineWidth', 2)
+    hold off
     xlabel('rhohv')
     ylabel('v bias')
-    ylim([-50 50])
-    title(['r^2 = ' num2str(mean([rsq11 rsq12]),'%.2f')])
+    ylim([-10 50])
+    title(['r^2 = ' num2str(rsq1,'%.2f')])
     
     subplot(3,2,2)
-%     scatter(phv, abs(vcorr), '.')
-    scatter(phv, vcorr, '.')
+     scatter(phv, abs(vcorr), '.')
+ %   scatter(phv, vcorr, '.')
+    hold on
+    plot(rhofit, vcfit1, 'k', 'LineWidth', 2)
+    hold off
     xlabel('rhohv')
     ylabel('v correction')
-    ylim([-50 50])
-    title(['r^2 = ' num2str(mean([rsq21 rsq22]),'%.2f')])
+    ylim([-10 50])
+    title(['r^2 = ' num2str(rsq2,'%.2f')])
     
     subplot(3,2,3)
     scatter(vtruth, vbias, '.')
@@ -1256,7 +1262,7 @@ if simr_plot(6)
     subplot(3,2,5)
     scatter(ucbias, vbias, '.')
     hold on
-    plot(ubfit, vbfit3, 'k', 'LineWidth', 2)
+    plot(ucbias, vbfit3, 'k', 'LineWidth', 2)
     hold off
     xlabel('original bias')
     ylabel('v bias')
@@ -1266,7 +1272,7 @@ if simr_plot(6)
     subplot(3,2,6)
     scatter(ucbias, vcorr, '.')
     hold on
-    plot(ubfit, vcfit3, 'k', 'LineWidth', 2)
+    plot(ucbias, vcfit3, 'k', 'LineWidth', 2)
     hold off
     xlabel('original bias')
     ylabel('v correction')

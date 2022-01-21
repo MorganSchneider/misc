@@ -19,9 +19,9 @@ dir_loc = [base_dir deb_titl];
 if ~exist('skipload', 'var')
     if exist('~/Downloads/density', 'dir')
         % filename = boonlib('choosefile', '~/Downloads/density', '*.iq');
-        filename = boonlib('choosefile', dirlist, '*.iq');
+        filename = blib('choosefile', dirlist, '*.iq');
     else
-        filename = boonlib('choosefile', dir_loc, '*.iq');
+        filename = blib('choosefile', dir_loc, '*.iq');
     end
     if ~isempty(filename)
         dat = simradariq(filename);

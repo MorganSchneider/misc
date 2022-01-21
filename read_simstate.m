@@ -4,21 +4,12 @@
 % clear
 % close all
 
-if ~exist('external_call', 'var')
-    [st,~] = dbstack('-completenames');
-    if length(st) > 1
-        external_call = 1;
-    else
-        external_call = 0;
-    end
-end
 
-if ~external_call
-    base_dir = '/Users/schneider/Documents/';
-    dir_loc = [base_dir 'sims']; % SimRadar output directory
-    sim_dir = uigetdir(dir_loc); % Location of IQ files
-    filename = blib('choosefile', sim_dir, '*.simstate');
-end
+base_dir = '/Users/schneider/Documents/';
+dir_loc = [base_dir 'sims']; % SimRadar output directory
+sim_dir = uigetdir(dir_loc); % Location of IQ files
+filename = blib('choosefile', sim_dir, '*.simstate');
+
 
 filt_deb_ht = true; % Filters based on debris height
 tol = 1; % Factor multiplying 0.5º to determine the range of elevation angles 
@@ -26,12 +17,13 @@ tol = 1; % Factor multiplying 0.5º to determine the range of elevation angles
 collect_vel_stats = true;
 
 % Name of file input
-% fname = 'sim-20200708-171431-E02.0';
+fname = filename(1:end-9);
 % Read Simstate file
-sdat = simradarstate([filename '.simstate']);
+sdat = simradarstate([fname '.simstate']);
 % Read IQ file
-simrad = simradariq([filename '.iq']);
-
+simrad = simradariq([fname '.iq']);
+% IMPORTANT!!! If you update SimRadar again (from git.arrc), go into simradarstate.m and
+% change 63*1024 to 64*1024 at the bottom
 
 x = sdat.pos(1,:);
 y = sdat.pos(2,:);
@@ -136,22 +128,53 @@ zz = r_mat * sin(el);
 
 % Plot debris locations in 3D (highlight those moving upward)
 figure(1)
-scatter3(x(deb_ind), y(deb_ind), z(deb_ind))
+scatter3(x(deb_ind), y(deb_ind), z(deb_ind), '.r')
 hold on
 ind = ws(deb_ind) > 0;
-scatter3(x(deb_ind(ind)), y(deb_ind(ind)), z(deb_ind(ind)), ws(deb_ind(ind)))
+scatter3(x(deb_ind(ind)), y(deb_ind(ind)), z(deb_ind(ind)), ws(deb_ind(ind)), 'b')
 xlabel('X(m)', 'FontSize', 14)
 ylabel('Y(m)', 'FontSize', 14)
 zlabel('Z(m)', 'FontSize', 14)
 hold off
-view(0,0)
+view(3)
+legend('Debris', 'Debris in updraft', 'Location', 'northeast')
+
+
+
+if ~exist('WS','var')
+    F = scatteredInterpolant(x(:),y(:),z(:),ws(:),'natural');
+    [xq,yq,zq] = ndgrid(-430:10:430, 1500:10:2500, 0:10:850);
+    WS = F(xq,yq,zq);
+end
+
+figure(8)
+axis tight manual
+scatter3(x(deb_ind), y(deb_ind), z(deb_ind), '.r')
+hold on
+ind = ws(deb_ind) > 0;
+scatter3(x(deb_ind(ind)), y(deb_ind(ind)), z(deb_ind(ind)), ws(deb_ind(ind)), 'ok')
+[f,v] = isosurface(xq, yq, zq, WS, 10);
+patch('Vertices', v, 'Faces', f, 'FaceColor', 'blue', 'EdgeColor', 'none', 'FaceAlpha', 0.1)
+hold off
+xlabel('X(m)', 'FontSize', 14)
+ylabel('Y(m)', 'FontSize', 14)
+zlabel('Z(m)', 'FontSize', 14)
+xlim([-400 400])
+ylim([1600 2400])
+zlim([10 700])
+view(3)
+legend('Debris', 'Debris in updraft', 'Location', 'northeast')
+
 
 % Plot histogram of debris
 figure(2)
-[C,X] = hist(z(deb_ind), 5:10:995);
-semilogy(X,C)
-xlabel('Height (m)', 'FontSize', 14)
-ylabel('Number of debris', 'FontSize', 14)
+[dnum,hgt] = hist(z(deb_ind), 5:10:995);
+% semilogy(hgt,dnum)
+% xlabel('Height (m)', 'FontSize', 14)
+% ylabel('Number of debris', 'FontSize', 14)
+semilogx(dnum, hgt, 'k', 'LineWidth', 1)
+xlabel('Number of debris', 'FontSize', 14)
+ylabel('Height (m)', 'FontSize', 14)
 grid on
 
 % Get coordinates of debris
@@ -219,25 +242,50 @@ mask = zeros(size(zh));
 mask(2:size(xx,1), 2:size(xx,2)) = 1;
 deb_cnt = deb_cnt .* mask; % Remove border points
 
+
 figure(3)
 pcolor(xx, yy, deb_cnt)
 shading flat
 colorbar
 xlabel('X(m)')
 ylabel('Y(m)')
-title('Debris Count')
+title('Debris Count in scan')
 
 % Scatter plot of Zh vs debris count
 figure(4)
+subplot(1,2,1)
 scatter(zh(:), deb_cnt(:))
 xlabel('Zh')
 ylabel('Debris Count')
+subplot(1,2,2)
+[N,c] = hist3([zh(:), deb_cnt(:)], 'Ctrs', {-7.5:2.5:57.5 0:2:24});
+[cx,cy] = meshgrid(c{1}, c{2});
+N(N==0) = nan;
+pcolor(cx, cy, N')
+colorbar
+shading flat
+xlim([-10 60])
+ylim([0 25])
+xlabel('Zh')
+ylabel('Debris count')
 
 % Scatter plot of Rhohv vs debris count
 figure(5)
+subplot(1,2,1)
 scatter(rhohv(:), deb_cnt(:))
 xlabel('Rhohv')
 ylabel('Debris Count')
+subplot(1,2,2)
+[N,c] = hist3([rhohv(:), deb_cnt(:)], 'Ctrs', {0:0.05:1 0:2:24});
+[cx,cy] = meshgrid(c{1}, c{2});
+N(N==0) = nan;
+pcolor(cx, cy, N')
+colorbar
+shading flat
+xlim([0 1])
+ylim([0 25])
+xlabel('Rhohv')
+ylabel('Debris count')
 
 % Max RCS - Mean RCS
 figure(6)
