@@ -40,7 +40,7 @@ clear
 % 3 - 
 % 4 - 
 % 5 - 
-simr_plot = [1 1 1 1 1 1];
+simr_plot = [0 0 0 0 0 1];
 koun_plot = [0 0 0 0 0];
 plot_save = 0;
 
@@ -56,7 +56,7 @@ dd(length(dts)).conc(length(cns)).el(length(els)) = struct();
 for dt = dts
     for cn = 1:length(cns)
         for el = 1:length(els)
-            dpsd_dir = ['Documents/sims/' LES '/' sim_date '/debris' num2str(dt) '/'];
+            dpsd_dir = ['~/Documents/sims/' LES '/' sim_date '/debris' num2str(dt) '/'];
             dpsd_fname = ['dpsd-PPI' num2str(els(el),'%.1f') '-DCU-d' num2str(dt) 'n' num2str(cns(cn)) '.mat'];
             tmp = load([dpsd_dir dpsd_fname]);
             dd(dt).conc(cn).el(el) = tmp;
@@ -79,12 +79,12 @@ va = round(dd(1).conc(1).el(1).params.va);
 
 % Load KOUN data into a structure
 obs_el = 0.5;
-obs_dir = 'Documents/code/obsdata/';
-obs_fname = ['dpsd-KOUN_20130520_' num2str(obs_el,'%.1f') '.mat'];
+obs_dir = '~/Documents/code/obsdata/';
+obs_fname = ['dpsd-KOUN_data_' num2str(obs_el,'%.1f') '.mat'];
 %obs_fname = 'dpsd-KOUN_data.mat';
 koun = load([obs_dir obs_fname]);
 
-img_dir = 'Documents/articles/2021/';
+img_dir = '~/Documents/articles/2021/';
 
 
 
@@ -100,10 +100,10 @@ if simr_plot(1)
     cn = 100000;
     el = 2.0;
     
-    dd_dir = ['Documents/sims/' LES '/' sim_date '/debris' num2str(dt) '/'];
+    dd_dir = ['~/Documents/sims/' LES '/' sim_date '/debris' num2str(dt) '/'];
     dd_fname = ['sim-PPI' num2str(el,'%.1f') '-DCU-d' num2str(dt) 'n' num2str(cn) '.mat'];
     ddsim = load([dd_dir dd_fname]);
-    nd_dir = ['Documents/sims/' LES '/' sim_date '/nodebris/'];
+    nd_dir = ['~/Documents/sims/' LES '/' sim_date '/nodebris/'];
     nd_fname = ['sim-PPI' num2str(el,'%.1f') '-U-nodebris.mat'];
     ndsim = load([nd_dir nd_fname]);
     
@@ -1299,8 +1299,7 @@ figure(100)
 pcolor(xx,yy,koun.vr_old)
 caxis([-va va])
 colormap(blib('rgmap2'))
-[ri,azi] = ginput(1);
-close()
+[ri,azi] = ginput(2);
 
 % Cropped PPIs w/ sample spectra gates marked
 if koun_plot(1)
@@ -1385,7 +1384,7 @@ if koun_plot(2)
     xlim([-va va])
     ylim([-15 15])
     yyaxis right
-    hs = semilogy(vvx, squeeze(koun.PSD.old(:,ri,azi)), 'LineWidth', 1);
+    hs = semilogy(vvx, squeeze(PSD.old(:,ri,azi)), 'LineWidth', 1);
     hs.Color = [0.6 0.6 0.6];
     hs.LineStyle = ':';
     ax.YAxis(1).Color = 'k';
@@ -1401,7 +1400,7 @@ if koun_plot(2)
     ylabel('s\rho_{HV}')
     xlim([-va va])
     yyaxis right
-    hs = semilogy(vvx, squeeze(koun.PSD.old(:,ri,azi)), 'LineWidth', 1);
+    hs = semilogy(vvx, squeeze(PSD.old(:,ri,azi)), 'LineWidth', 1);
     hs.Color = [0.6 0.6 0.6];
     hs.LineStyle = ':';
     ax.YAxis(1).Color = 'k';
@@ -1423,28 +1422,37 @@ if koun_plot(3)
     clf
     
     subplot(2,1,1)
-    semilogy(vvx, squeeze(koun.PSD.agg(:,ri,azi)), '-k', 'LineWidth', 1)
+    semilogy(vvx, squeeze(PSD.agg(:,ri,azi)), 'LineWidth', 1)
     hold on
     plot(ones(1,2)*koun.vr_old(ri,azi), [1 1e10], ':b', 'LineWidth', 2)
-    plot(ones(1,2)*koun.vr_new.agg(ri,azi), [1 1e10], ':r', 'LineWidth', 2)
+    plot(ones(1,2)*koun.vr_new.agg(ri,azi), [-15 15], ':r', 'LineWidth', 2)
     hold off
     xlabel('v (m s^{-1})')
     ylabel('sS_H')
     xlim([-va va])
     grid on
+    ylabel('sS_H')
     title('Velocity correction', 'FontSize', 14)
     
     subplot(2,1,2)
-    semilogy(vvx, squeeze(koun.PSD.agg(:,ri,azi)), '-k', 'LineWidth', 1);
+    yyaxis left
+    plot(vvx, squeeze(koun.sphv(:,ri,azi)), '-k', 'LineWidth', 1.1)
     hold on
-    plot(ones(1,2)*koun.vr_old(ri,azi), [1 1e10], ':b', 'LineWidth', 2)
-    plot(ones(1,2)*koun.vr_new.agg(ri,azi), [1 1e10], ':r', 'LineWidth', 2)
+    plot(ones(1,2)*koun.vr_old(ri,azi), [0 1], ':b', 'LineWidth', 2)
+    plot(ones(1,2)*koun.vr_new.agg(ri,azi), [0 1], ':r', 'LineWidth', 2)
     hold off
     xlabel('v (m s^{-1})')
-    ylabel('sS_H')
+    ylabel('s\rho_{HV}')
     xlim([-va va])
+    yyaxis right
+    hs = semilogy(vvx, squeeze(PSD.old(:,ri,azi)), 'LineWidth', 1);
+    hs.Color = [0.6 0.6 0.6];
+    hs.LineStyle = ':';
+    ax.YAxis(1).Color = 'k';
+    ax.YAxis(2).Color = [0.6 0.6 0.6];
     grid on
-    title('Velocity correction', 'FontSize', 14)
+    ylabel('sS_H')
+    title('(b) s\rho_{HV}, sS_H', 'FontSize', 14)
     
     
     if plot_save
@@ -1486,64 +1494,8 @@ end
 
 
 
-return
-%% Make post-correction velocity stats plots???
 
-
-% Delta V
-figure(20)
-
-clf
-    
-    hs = subplot(1,2,1);
-    plot(nd.avg.dv, els, '-r', 'LineWidth', 2.5)
-    hold on
-    plot(dd(1).conc(1).avg.dv, els, 'Color', [0 0.5 0.9], 'LineStyle', ':', 'LineWidth', 2)
-    plot(dd(1).conc(2).avg.dv, els, 'Color', [0 0.5 0.9], 'LineStyle', '--', 'LineWidth', 1.7)
-    plot(dd(3).conc(1).avg.dv, els, ':k', 'LineWidth', 2)
-    plot(dd(3).conc(2).avg.dv, els, '--k', 'LineWidth', 1.7)
-    hold off
-    xlim([0 200])
-    xticks(0:25:200)
-    title('\DeltaV', 'FontSize', 16)
-    xlabel('Velocity (m s^{-1})', 'FontSize', 14)
-    ylabel('Elevation angle (\circ)', 'FontSize', 14)
-    legend('Truth', '10,000 leaves', '100,000 leaves', '10,000 wood boards',...
-        '100,000 wood boards', 'Location', 'northeastoutside')
-    set(hs, 'Position', [0.08 0.11 0.335 0.8150], 'Units', 'normalized')
-    
-    hs(2) = subplot(1,2,2);
-    plot(dcmp(1).conc(1).dv, els, 'Color', [0 0.5 0.9], 'LineStyle', ':', 'LineWidth', 2)
-    hold on
-    plot(dcmp(1).conc(2).dv, els, 'Color', [0 0.5 0.9], 'LineStyle', '--', 'LineWidth', 1.7)
-    plot(dcmp(3).conc(1).dv, els, ':k', 'LineWidth', 2)
-    plot(dcmp(3).conc(2).dv, els, '--k', 'LineWidth', 1.7)
-    hold off
-    xlim([-150 25])
-    xticks(-150:25:25)
-    title('\DeltaV bias', 'FontSize', 16)
-    xlabel('Velocity (m s^{-1})', 'FontSize', 14)
-    ylabel('Elevation angle (\circ)', 'FontSize', 14)
-    set(hs(2), 'Position', [0.62 0.11 0.335 0.8150], 'Units', 'normalized')
-    
-    annotation('textbox', [0.08 0.844 0.035 0.08], 'String', 'a',...
-        'FontSize',18,'FontWeight','bold','EdgeColor','k','LineWidth',1,...
-        'HorizontalAlignment','center','VerticalAlignment','middle',...
-        'BackgroundColor','w')
-    annotation('textbox', [0.62 0.844 0.035 0.08], 'String', 'b',...
-        'FontSize',18,'FontWeight','bold','EdgeColor','k','LineWidth',1,...
-        'HorizontalAlignment','center','VerticalAlignment','middle',...
-        'BackgroundColor','w')
-    
-    set(gcf, 'Units', 'inches', 'Position', [2 3 12 5])
-    if plot_save
-        print([fig_dir 'deltav'], '-dpng')
-    end
-
-
-
-% GBVTD
-figure(21)
+%%
 
 
 
